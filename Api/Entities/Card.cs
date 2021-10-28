@@ -8,7 +8,7 @@ namespace Api.Entities
         [Required] public int Id;
         [Required] public string Name;
         [Required] public CardType Type;
-        [Required] public DebateType InvokeableBy;
+        [Required] public DebaterType InvokeableBy;
         [Required] public Collection Collection; 
         [Required] public CardRarity Rarity;
         [Required] public int Attack;

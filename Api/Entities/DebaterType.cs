@@ -1,6 +1,6 @@
 ﻿namespace Api.Entities
 {
-    public enum DebateType
+    public enum DebaterType
     {
         
     }
