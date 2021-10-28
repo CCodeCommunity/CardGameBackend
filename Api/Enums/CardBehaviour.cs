@@ -1,4 +1,4 @@
-﻿namespace Api.Entities
+﻿namespace Api.Models
 {
     public enum CardBehaviour
     {
