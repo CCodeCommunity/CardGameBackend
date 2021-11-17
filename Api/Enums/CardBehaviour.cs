@@ -1,7 +1,6 @@
-﻿namespace Api.Models
+﻿namespace Api.Enums;
+
+public enum CardBehaviour
 {
-    public enum CardBehaviour
-    {
         
-    }
 }

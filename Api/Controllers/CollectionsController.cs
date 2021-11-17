@@ -1,46 +1,86 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
+using Api.Authorization;
 using Api.Dtos;
 using Api.Models;
+using Ardalis.Filters;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
-namespace Api.Controllers
+namespace Api.Controllers;
+
+[Authorize]
+[ValidateModel]
+[ApiController, Route("[controller]")]
+public class CollectionsController : ControllerBase
 {
-    [ApiController]
-    [Route("[controller]")]
-    public class CollectionsController : ControllerBase
+    private readonly DatabaseContext db;
+
+    public CollectionsController(DatabaseContext db)
     {
-        private readonly DatabaseContext _db;
+        this.db = db;
+    }
+    
+    [HttpGet]
+    public async Task<ActionResult<List<CardCollection>>> GetAll()
+    {
+        var collections = await db.CardCollections.ToListAsync();
+        return Ok(collections);
+    }
 
-        public CollectionsController(DatabaseContext db)
+    [HttpGet("{collectionId:int}")]
+    public async Task<ActionResult<CardCollection>> Get(int collectionId)
+    {
+        var result = await db.CardCollections.FindAsync(collectionId);
+        if (result == null) return UnprocessableEntity();
+
+        return Ok(result);
+    }
+    
+    [HttpPost]
+    [Authorize(Roles = AuthorizationRoles.Admin)]
+    public async Task<ActionResult<CardCollection>> Create([FromBody] CreateCardCollection.Request request)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.PrimarySid);
+        
+        var newCollection = new CardCollection 
         {
-            _db = db;
-        }
+            Name = request.Name,
+            ImageUrl = request.ImageUrl,
+            CreatorId = userId, 
+        };
 
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Collection>>> Get()
-        {
-            return Ok(await _db.Collections.ToListAsync());
-        }
+        await db.AddAsync(newCollection);
 
-        [HttpPost]
-        public async Task<ActionResult<Collection>> Post([FromBody] PostCollection.Request request)
-        {
-            var newCollection = new Collection 
-            {
-                Name = request.Name,
-                ImageUrl = request.ImageUrl
-            };
+        await db.SaveChangesAsync();
 
-            await _db.AddAsync(newCollection);
+        return Ok(newCollection);
+    }
 
-            await _db.SaveChangesAsync();
+    [HttpPatch("{collectionId:int}")]
+    [Authorize(Roles = AuthorizationRoles.Admin)]
+    public async Task<ActionResult> Patch(int collectionId, [FromBody] PatchCardCollection.Request request)
+    {
+        var collection = await db.CardCollections.FindAsync(collectionId);
+        if (collection == null) return UnprocessableEntity();
+        
+        collection.Name = request.Name ?? collection.Name;
+        collection.ImageUrl = request.Name ?? collection.ImageUrl;
 
-            return Ok(newCollection);
-        }
+        await db.SaveChangesAsync();
+
+        return Ok();
+    }
+    
+    [HttpPatch("{collectionId:int}")]
+    [Authorize(Roles = AuthorizationRoles.Admin)]
+    public async Task<ActionResult> Delete(int collectionId)
+    {
+        var recordsAffected = await db.CardCollections.DeleteByKeyAsync(collectionId);
+        if (recordsAffected == 0) return UnprocessableEntity();
+        
+        return Ok();
     }
 }

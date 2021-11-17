@@ -1,26 +1,28 @@
-﻿// Disable null checks here as they are not necessary because we know these will be initialized by EF
-#pragma warning disable 8618
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Api.Enums;
 
-using System.ComponentModel.DataAnnotations;
+namespace Api.Models;
 
-namespace Api.Models
+public class Card
 {
-    public class Card
-    {
-        [Required] public int Id;
-        [Required] public string Name;
-        [Required] public CardType Type;
-        [Required] public DebaterType InvokeableBy;
-        [Required] public Collection Collection; 
-        [Required] public CardRarity Rarity;
-        [Required] public int Attack;
-        [Required] public int Health;
-        [Required] public int Cost;
-        [Required] public string Description;
-        [Required] public string Quote;
-        [Required] public string QuoteURL;
-        [Required] public string ImageURL;
-        [Required] public CardBehaviour Behaviour;
-        [Required] public Account Creator;
-    }
+    [Key] [DatabaseGenerated(DatabaseGeneratedOption.Identity)] 
+    [Required] public int Id { get; set; } 
+    [Required] public string Name { get; set; } = null!; 
+    [Required] public CardType Type { get; set; } 
+    [Required] public DebaterType InvokeableBy { get; set; }
+    [Required] public int CardCollectionId { get; set; }
+    [Required] public CardCollection CardCollection { get; set; } = null!;  
+    [Required] public CardRarity Rarity { get; set; } 
+    [Required] public int Attack { get; set; } 
+    [Required] public int Health { get; set; } 
+    [Required] public int Cost { get; set; }
+    [Required] public string Description { get; set; } = null!; 
+    [Required] public string Quote { get; set; } = null!; 
+    [Required] [Url] public string QuoteUrl { get; set; } = null!; 
+    [Required] [Url] public string ImageUrl { get; set; } = null!;
+    [Required] [Url] public string HearthstoneEquivalentUrl { get; set; } = null!;
+    [Required] public CardBehaviour Behaviour { get; set; }
+    [Required] public string CreatorId { get; set; } = null!;
+    [Required] [ForeignKey("CreatorId")] public Account Creator { get; set; } = null!; 
 }
