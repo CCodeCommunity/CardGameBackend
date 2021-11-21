@@ -40,7 +40,7 @@ public class TestAdmin : IDisposable
             Id = await Nanoid.Nanoid.GenerateAsync(),
             Name = Name,
             Email = Email,
-            Password = await Argon2Utils.HashPassword(Password),
+            Password = await Argon2Utils.HashPasswordAsync(Password),
             Role = AccountRole.Admin,
             State = AccountState.Active
         };

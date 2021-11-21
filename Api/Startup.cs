@@ -3,7 +3,10 @@ using System.Text;
 using Api.Authorization;
 using Api.Authorization.Handlers;
 using Api.Authorization.Requirements;
+using Api.Enums;
+using Api.Models;
 using Api.Services;
+using Api.Utilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -74,6 +77,18 @@ public sealed class Startup
                 using var context = new DatabaseContext(dbOptions);
 
                 context.Database.EnsureCreated();
+
+                context.Accounts.Add(new Account
+                {
+                    Id = Nanoid.Nanoid.Generate(),
+                    Name = "admin",
+                    Email = "admin@cardgame.cc",
+                    Password = Argon2Utils.HashPassword("admin"),
+                    Role = AccountRole.Admin,
+                    State = AccountState.Active
+                });
+
+                context.SaveChangesAsync();
             });
             
         services.AddScoped<AuthTokenService, AuthTokenService>();

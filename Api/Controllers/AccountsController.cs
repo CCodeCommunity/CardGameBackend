@@ -143,7 +143,7 @@ public class AccountsController : Controller
             Id = await Nanoid.Nanoid.GenerateAsync(),
             Name = request.Name,
             Email = request.Email,
-            Password = await Argon2Utils.HashPassword(request.Password),
+            Password = await Argon2Utils.HashPasswordAsync(request.Password),
             Role = AccountRole.User,
             State = AccountState.PendingApproval
         };

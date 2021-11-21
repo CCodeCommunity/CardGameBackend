@@ -16,7 +16,7 @@ public static class Argon2Utils
         return buffer;
     }
         
-    public static async Task<string> HashPassword(string password)
+    public static async Task<string> HashPasswordAsync(string password)
     {
         var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password));
         argon2.Salt = CreateSalt();
@@ -28,10 +28,23 @@ public static class Argon2Utils
         
         return bytes.ToString()!;
     }
+    
+    public static string HashPassword(string password)
+    {
+        var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password));
+        argon2.Salt = CreateSalt();
+        argon2.DegreeOfParallelism = 8; // four cores
+        argon2.Iterations = 4;
+        argon2.MemorySize = 1024 * 1024; // 1 GB
+
+        var bytes = argon2.GetBytes(16); 
+        
+        return bytes.ToString()!;
+    }
         
     public static async Task<bool> VerifyHashAsync(string password, string hash)
     {
-        var newHash = await HashPassword(password);
+        var newHash = await HashPasswordAsync(password);
         return hash == newHash;
     }
 }
