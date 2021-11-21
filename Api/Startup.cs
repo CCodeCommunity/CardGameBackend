@@ -1,5 +1,3 @@
-namespace Api;
-
 using System;
 using System.Text;
 using Api.Authorization;
@@ -17,6 +15,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+
+namespace Api;
 
 public sealed class Startup
 {
@@ -45,7 +45,7 @@ public sealed class Startup
         services.AddHttpContextAccessor();
 
         services.AddSwaggerGen(c => { c.SwaggerDoc("v1", new OpenApiInfo {Title = "Api", Version = "v1"}); });
-        //
+        
         // services.Configure<ForwardedHeadersOptions>(options =>
         // {
         //     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -54,11 +54,13 @@ public sealed class Startup
         services.AddDbContext<DatabaseContext>(options => options.UseNpgsql(Configuration["DatabaseSettings:ConnectionString"]));
             
         services.AddScoped<AuthTokenService, AuthTokenService>();
-            
-        services.AddScoped<IAuthorizationHandler, DefaultAuthorizationHandler>();
-            
-        services.AddScoped<AccountStateValidationService, AccountStateValidationService>();
 
+        services.AddScoped<AccessTokenBlackListService, AccessTokenBlackListService>();
+        
+        services.AddScoped<IAuthorizationHandler, DefaultAuthorizationHandler>();
+        
+        // services.AddScoped<IAuthorizationHandler, AccountIdentityHandler>();
+        
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
         {
             options.TokenValidationParameters = new TokenValidationParameters
@@ -76,8 +78,20 @@ public sealed class Startup
 
         services.AddAuthorization(options =>
         {
-            options.AddPolicy(AuthorizationPolicies.DefaultPolicy, 
-                p => p.Requirements.Add(new DefaultAuthorization()));
+            options.AddPolicy(AuthorizationPolicies.DefaultPolicy, p => p
+                .RequireAuthenticatedUser()
+                .AddRequirements(new DefaultAuthorization())
+            );
+
+            options.AddPolicy(AuthorizationPolicies.RequireAdminOnly, p => p
+                .RequireAuthenticatedUser()
+                .AddRequirements(new DefaultAuthorization())
+                .RequireRole(AuthorizationRoles.Admin));
+
+            options.AddPolicy(AuthorizationPolicies.RequireMatchingAccountId, p => p
+                .RequireAuthenticatedUser()
+                .AddRequirements(new DefaultAuthorization())
+                .AddRequirements(new AccountIdentityAuthorization()));
             
             options.DefaultPolicy = options.GetPolicy(AuthorizationPolicies.DefaultPolicy)!;
         });

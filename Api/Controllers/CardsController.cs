@@ -1,8 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Claims;
+﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
+using Api.Authorization;
 using Api.Dtos;
 using Api.Enums;
 using Api.Models;
@@ -16,7 +15,7 @@ namespace Api.Controllers;
 
 [Authorize]
 [ValidateModel]
-[ApiController, Route("[controller]")]
+[ApiController, Route("api/[controller]")]
 public class CardsController : ControllerBase
 {
     private readonly DatabaseContext db;
@@ -25,38 +24,46 @@ public class CardsController : ControllerBase
     {
         this.db = db;
     }
+
+    [HttpGet("count")]
+    [Authorize]
+    public async Task<ActionResult<CardsCount.Response>> Count()
+    {
+        var result = await db.Cards.CountAsync();
+        return Ok(new CardsCount.Response(result));
+    }
     
     [HttpGet("{cardId:int}")]
     [Authorize]
     public async Task<ActionResult<Card>> GetCard(int cardId)
     {
         var card = await db.Cards.FindAsync(cardId);
+        if (card == null) 
+            return UnprocessableEntity();
+        
         return Ok(card);
     }
     
     [HttpGet]
     [Authorize]
-    public async Task<ActionResult<List<Card>>> GetCards([FromQuery] int page, [FromQuery] int pageSize)
+    public async Task<ActionResult<List<Card>>> GetCards(
+        [FromQuery, Range(1, int.MaxValue)] int page, 
+        [FromQuery, Range(1, int.MaxValue)] int pageSize)
     {
         var cards = await db.Cards.GetPagedAsync(page, pageSize);
         return Ok(cards);
     }
 
-    [HttpDelete("{cardId:Int}")]
-    [Authorize]
+    [HttpDelete("{cardId:int}")]
+    [Authorize(Roles = AuthorizationRoles.Admin)]
     public async Task<ActionResult> Delete(int cardId)
     {
-        var userId = User.FindFirstValue(ClaimTypes.PrimarySid);
-        var userRole = Enum.Parse<AccountRole>(User.FindFirstValue(ClaimTypes.Role));
-        if (userRole != AccountRole.Admin) return Forbid();
+        var affected = await db.Cards.DeleteByKeyAsync(cardId);
+        if (affected == 0) 
+            return UnprocessableEntity();
 
-        var card = await db.Cards.Where(it => it.Id == cardId).Select(it => new { it.CreatorId }).FirstOrDefaultAsync();
-        if (card == null) return UnprocessableEntity();
-        if (card.CreatorId != userId) return Forbid();
-
-        await db.Cards.SingleDeleteAsync(new Card { Id = cardId });
         await db.SaveChangesAsync();
-
+        
         return Ok();
     }
 
@@ -68,7 +75,6 @@ public class CardsController : ControllerBase
         {
             Name = request.Name,
             Type = request.Type,
-            InvokeableBy = request.InvokeableBy,
             CardCollectionId = request.CardCollectionId,
             Rarity = request.Rarity,
             Attack = request.Attack,
@@ -79,7 +85,6 @@ public class CardsController : ControllerBase
             QuoteUrl = request.QuoteUrl,
             ImageUrl = request.ImageUrl,
             HearthstoneEquivalentUrl = request.HearthstoneEquivalentUrl,
-            Behaviour = request.Behaviour,
             CreatorId = request.CreatorId,
         };
 
@@ -94,15 +99,14 @@ public class CardsController : ControllerBase
     public async Task<ActionResult<Card>> Patch(int cardId, [FromBody] PatchCard.Request request)
     {
         var card = await db.Cards.FindAsync(cardId);
-        if (card == null) return UnprocessableEntity();
+        if (card == null)
+            return UnprocessableEntity();
         
-        var userId = User.FindFirstValue(ClaimTypes.PrimarySid);
-        var userRole = Enum.Parse<AccountRole>(User.FindFirstValue(ClaimTypes.Role));
-        if (userRole != AccountRole.Admin && card.CreatorId != userId) return Forbid();
+        if (User.Role() != AccountRole.Admin && card.CreatorId != User.Id())
+            return Forbid();
 
         card.Name = request.Name ?? card.Name;
         card.Type = request.Type ?? card.Type;
-        card.InvokeableBy = request.InvokeableBy ?? card.InvokeableBy;
         card.CardCollectionId = request.CardCollectionId ?? card.CardCollectionId;
         card.Rarity = request.Rarity ?? card.Rarity;
         card.Attack = request.Attack ?? card.Attack;
@@ -113,7 +117,6 @@ public class CardsController : ControllerBase
         card.QuoteUrl = request.QuoteUrl ?? card.QuoteUrl;
         card.ImageUrl = request.ImageUrl ?? card.ImageUrl;
         card.HearthstoneEquivalentUrl = request.HearthstoneEquivalentUrl ?? card.HearthstoneEquivalentUrl;
-        card.Behaviour = request.Behaviour ?? card.Behaviour;
 
         await db.SaveChangesAsync();
 

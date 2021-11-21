@@ -6,19 +6,17 @@ namespace Api.Dtos;
 public static class PatchCard
 {
     public record Request(
-        string? Name,
-        CardType? Type,
-        DebaterType? InvokeableBy,
-        int? CardCollectionId,
-        CardRarity? Rarity,
-        int? Attack,
-        int? Health,
-        int? Cost,
-        string? Description,
-        string? Quote,
-        string? QuoteUrl,
-        string? ImageUrl,
-        string? HearthstoneEquivalentUrl,
-        CardBehaviour? Behaviour
+        string? Name = null,
+        CardType? Type = null,
+        int? CardCollectionId = null,
+        CardRarity? Rarity = null,
+        int? Attack = null,
+        int? Health = null,
+        int? Cost = null,
+        string? Description = null,
+        string? Quote = null,
+        string? QuoteUrl = null,
+        string? ImageUrl = null,
+        string? HearthstoneEquivalentUrl = null
     );
 }

@@ -10,7 +10,7 @@ public static class MiscUtils
     public static async Task<T?> ParseJsonAsync<T>(this HttpResponseMessage message)
     {
         var content = await message.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<T>(content);
+        var result = JsonSerializer.Deserialize<T>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
         return result;
     }

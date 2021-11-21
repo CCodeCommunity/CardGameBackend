@@ -4,6 +4,7 @@ using System.Data.Common;
 using System.Linq;
 using Api;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -48,6 +49,11 @@ public class IntegrationTestEnvironment : IDisposable
             });
 
         Client = App.CreateClient();
+    }
+
+    public void SetAccessToken(string token)
+    {
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
     public void Dispose()

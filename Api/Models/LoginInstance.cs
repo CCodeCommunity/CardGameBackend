@@ -1,8 +1,10 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Models;
 
+[Index(nameof(AccountId), IsUnique = false)]
 public class LoginInstance
 {
     [Key] public string Token { get; set; } = null!;
@@ -22,4 +24,6 @@ public class LoginInstance
     [Required] public string AccountId { get; set; } = null!;
         
     [Required] public Account Account { get; set; } = null!;
+    
+    [Required] public bool Valid { get; set; }
 }

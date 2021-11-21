@@ -1,19 +1,20 @@
 ﻿using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using Api.Authorization;
 using Api.Dtos;
 using Api.Models;
+using Api.Utilities;
 using Ardalis.Filters;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using static Api.Authorization.AuthorizationPolicies;
 
 namespace Api.Controllers;
 
 [Authorize]
 [ValidateModel]
-[ApiController, Route("[controller]")]
+[ApiController, Route("api/[controller]")]
 public class CollectionsController : ControllerBase
 {
     private readonly DatabaseContext db;
@@ -34,22 +35,23 @@ public class CollectionsController : ControllerBase
     public async Task<ActionResult<CardCollection>> Get(int collectionId)
     {
         var result = await db.CardCollections.FindAsync(collectionId);
-        if (result == null) return UnprocessableEntity();
+        if (result == null) 
+            return UnprocessableEntity();
 
         return Ok(result);
     }
     
     [HttpPost]
-    [Authorize(Roles = AuthorizationRoles.Admin)]
+    [Authorize(Policy = RequireAdminOnly)]
     public async Task<ActionResult<CardCollection>> Create([FromBody] CreateCardCollection.Request request)
     {
-        var userId = User.FindFirstValue(ClaimTypes.PrimarySid);
+        var userId = User.Id();
         
         var newCollection = new CardCollection 
         {
             Name = request.Name,
             ImageUrl = request.ImageUrl,
-            CreatorId = userId, 
+            CreatorId = userId,
         };
 
         await db.AddAsync(newCollection);
@@ -60,26 +62,28 @@ public class CollectionsController : ControllerBase
     }
 
     [HttpPatch("{collectionId:int}")]
-    [Authorize(Roles = AuthorizationRoles.Admin)]
+    [Authorize(Policy = RequireAdminOnly)]
     public async Task<ActionResult> Patch(int collectionId, [FromBody] PatchCardCollection.Request request)
     {
         var collection = await db.CardCollections.FindAsync(collectionId);
-        if (collection == null) return UnprocessableEntity();
+        if (collection == null) 
+            return UnprocessableEntity();
         
         collection.Name = request.Name ?? collection.Name;
-        collection.ImageUrl = request.Name ?? collection.ImageUrl;
+        collection.ImageUrl = request.ImageUrl ?? collection.ImageUrl;
 
         await db.SaveChangesAsync();
 
         return Ok();
     }
     
-    [HttpPatch("{collectionId:int}")]
-    [Authorize(Roles = AuthorizationRoles.Admin)]
+    [HttpDelete("{collectionId:int}")]
+    [Authorize(Policy = RequireAdminOnly)]
     public async Task<ActionResult> Delete(int collectionId)
     {
         var recordsAffected = await db.CardCollections.DeleteByKeyAsync(collectionId);
-        if (recordsAffected == 0) return UnprocessableEntity();
+        if (recordsAffected == 0) 
+            return UnprocessableEntity();
         
         return Ok();
     }

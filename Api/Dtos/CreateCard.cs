@@ -1,5 +1,4 @@
 ﻿using Api.Enums;
-using Api.Models;
 
 namespace Api.Dtos;
 
@@ -8,8 +7,7 @@ public static class CreateCard
     public record Request(
         string Name,
         CardType Type,
-        DebaterType InvokeableBy,
-        int CardCollectionId,
+        int? CardCollectionId,
         CardRarity Rarity,
         int Attack,
         int Health,
@@ -18,8 +16,7 @@ public static class CreateCard
         string Quote,
         string QuoteUrl,
         string ImageUrl,
-        string HearthstoneEquivalentUrl,
-        CardBehaviour Behaviour,
+        string? HearthstoneEquivalentUrl,
         string CreatorId
     );
 }

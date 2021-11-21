@@ -1,8 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
+using Api.Enums;
 using Api.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -12,26 +13,35 @@ namespace Api.Services;
 public class AuthTokenService
 {
     private readonly string jwtKey;
-        
     private readonly string jwtIssuer;
-
-    private readonly int jwtAccessTokenExpiry;
+    private readonly int jwtAccessTokenExpiryInMinutes;
+    private readonly int jwtRefreshTokenExpiryInMonths;
         
     public AuthTokenService(IConfiguration config)
     {
         jwtKey = config["Jwt:Key"];
         jwtIssuer = config["Jwt:Issuer"];
-        jwtAccessTokenExpiry = int.Parse(config["Jwt:AccessTokenExpiryInMinutes"]);
+        jwtAccessTokenExpiryInMinutes = int.Parse(config["Jwt:AccessTokenExpiryInMinutes"]);
+        jwtRefreshTokenExpiryInMonths = int.Parse(config["Jwt:RefreshTokenExpiryInMonths"]);
     }
-
-    public string GenerateRefreshToken()
+    
+    public string? GenerateRefreshToken(Account account)
     {
-        var randomNumber = new byte[32];
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(randomNumber);
-        return Convert.ToBase64String(randomNumber);
-    }
+        var claims = new[] 
+        {
+            new Claim(ClaimTypes.PrimarySid, account.Id),
+            new Claim(ClaimTypes.Name, account.Name),
+            new Claim(ClaimTypes.Email, account.Email),
+            new Claim(ClaimTypes.Role, account.Role.ToString()),
+            new Claim("scope", AuthorizationScope.Refresh.ToString())
+        };
+        
+        var issuedAt = DateTime.UtcNow;
+        var expiresAt = issuedAt.AddMonths(jwtRefreshTokenExpiryInMonths);
 
+        return generateToken(claims, issuedAt, expiresAt);
+    }
+    
     public string? GenerateAccessToken(Account account)
     {
         var claims = new[] 
@@ -40,16 +50,23 @@ public class AuthTokenService
             new Claim(ClaimTypes.Name, account.Name),
             new Claim(ClaimTypes.Email, account.Email),
             new Claim(ClaimTypes.Role, account.Role.ToString()),
-            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+            new Claim("scope", AuthorizationScope.Access.ToString())
         };
-
+        
         var issuedAt = DateTime.UtcNow;
-        var expiresAt = issuedAt.AddMinutes(jwtAccessTokenExpiry);
+        var expiresAt = issuedAt.AddMinutes(jwtAccessTokenExpiryInMinutes);
+
+        return generateToken(claims, issuedAt, expiresAt);
+    }
+
+    private string? generateToken(IEnumerable<Claim> claims, DateTime issuedAt, DateTime expiresAt)
+    {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256Signature);
         var tokenDescriptor = new JwtSecurityToken(
             new JwtHeader(signingCredentials: credentials),
-            new JwtPayload(issuer: jwtIssuer, audience: jwtIssuer, claims: claims, expires: expiresAt, issuedAt: issuedAt, notBefore: null));
+            new JwtPayload(issuer: jwtIssuer, audience: jwtIssuer, claims: claims, 
+                expires: expiresAt, issuedAt: issuedAt, notBefore: null));
 
         return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);  
     }
@@ -66,8 +83,7 @@ public class AuthTokenService
                 new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
-                    ValidateIssuer = true, 
-                    ValidateAudience = true,    
+                    ValidateLifetime = true,
                     ValidIssuer = jwtIssuer,
                     ValidAudience = jwtIssuer, 
                     IssuerSigningKey = mySecurityKey

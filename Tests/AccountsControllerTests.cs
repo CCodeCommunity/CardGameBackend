@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 using Api.Dtos;
+using Api.Enums;
 using Api.Models;
 using Api.Services;
 using Api.Utilities;
@@ -19,7 +20,7 @@ namespace Tests;
 public class AccountsControllerTests
 {
     [Fact]
-    public async Task CreateAccount_WithoutArguments_ReturnsBadResponse()
+    public async Task CreateAccount_WithoutArguments_ExpectsBadResponse()
     {
         // Arrange
         using var env = new IntegrationTestEnvironment();
@@ -34,7 +35,7 @@ public class AccountsControllerTests
     }
     
     [Fact]
-    public async Task CreateAccount_WithInvalidEmail_ReturnsBadResponse()
+    public async Task CreateAccount_WithInvalidEmail_ExpectsBadResponse()
     {
         // Arrange
         using var env = new IntegrationTestEnvironment();
@@ -49,7 +50,7 @@ public class AccountsControllerTests
     }
     
     [Fact]
-    public async Task CreateAccount_WithTooShortOfAPassword_ReturnsBadResponse()
+    public async Task CreateAccount_WithTooShortOfAPassword_ExpectsBadResponse()
     {
         // Arrange
         using var env = new IntegrationTestEnvironment();
@@ -100,16 +101,15 @@ public class AccountsControllerTests
     }
 
     [Fact]
-    public async Task LoginUser_GetNewAccessToken_ReturnSuccessful()
+    public async Task LoginUser_GetNewAccessToken_ExpectsSuccessful()
     {
         // Arrange
         using var env = new IntegrationTestEnvironment();
         
-        var user = new TestUser(env);
-        await user.Setup();
-        
+        var user = await TestUser.MakeAsync(env);
+
         var request = new Login.Request(
-            Email: user.Account.Email, 
+            Email: user.Value.Email,
             Password: TestUser.Password, 
             Device: "Test",
             DeviceAgent: "Test", 
@@ -119,8 +119,7 @@ public class AccountsControllerTests
         var loginResponse = await env.Client.PostAsJsonAsync("https://localhost:5001/api/accounts/login", request);
         var loginResult = (await loginResponse.Content.ReadFromJsonAsync<Login.Response>())!;
         
-        var getAccessTokenResponse = await env.Client.PatchAsJsonAsync("https://localhost:5001/api/accounts/access-token",
-            new GetAccessToken.Request(RefreshToken: loginResult.RefreshToken, AccessToken: loginResult.AccessToken));
+        var getAccessTokenResponse = await env.Client.PatchAsJsonAsync("https://localhost:5001/api/accounts/access-token", new GetAccessToken.Request(loginResult.RefreshToken));
         var getAccessTokenResult = (await getAccessTokenResponse.Content.ReadFromJsonAsync<GetAccessToken.Response>())!;
         
         // Assert
@@ -134,16 +133,14 @@ public class AccountsControllerTests
     }
     
     [Fact]
-    public async Task LoginUser_GetNewAccessToken_TryOldAccessToken_BothTokensAreNowInvalid()
+    public async Task LoginUser_GetNewAccessToken_TryOldAccessToken_ExpectsBothTokensAreNowInvalid()
     {
         // Arrange
         using var env = new IntegrationTestEnvironment();
-        
-        var user = new TestUser(env);
-        await user.Setup();
-        
+        var user = await TestUser.MakeAsync(env);
+
         var request = new Login.Request(
-            Email: user.Account.Email, 
+            Email: user.Value.Email, 
             Password: TestUser.Password, 
             Device: "Test",
             DeviceAgent: "Test", 
@@ -154,7 +151,7 @@ public class AccountsControllerTests
         var loginResult = (await loginResponse.Content.ReadFromJsonAsync<Login.Response>())!;
         
         var getAccessTokenResponse = await env.Client.PatchAsJsonAsync("https://localhost:5001/api/accounts/access-token",
-            new GetAccessToken.Request(RefreshToken: loginResult.RefreshToken, AccessToken: loginResult.AccessToken));
+            new GetAccessToken.Request(RefreshToken: loginResult.RefreshToken));
         var getAccessTokenResult = (await getAccessTokenResponse.Content.ReadFromJsonAsync<GetAccessToken.Response>())!;
         
         // Assert
@@ -168,15 +165,14 @@ public class AccountsControllerTests
     }
     
     [Fact]
-    public async Task CreateAccount_GetListForAdmin_ReturnsSuccessful()
+    public async Task CreateAccount_GetListForAdmin_ExpectsSuccessful()
     {
         // Arrange
         using var env = new IntegrationTestEnvironment();
 
-        var admin = new TestAdmin(env);
-        await admin.Setup();
-        
-        var loginRequest = new Login.Request(Email: admin.Account.Email, Password: TestUser.Password, Device: "Test", DeviceAgent: "Test", DeviceOS: "Test");
+        var admin = await TestAdmin.MakeAsync(env);
+
+        var loginRequest = new Login.Request(Email: admin.Value.Email, Password: TestUser.Password, Device: "Test", DeviceAgent: "Test", DeviceOS: "Test");
         var createAccountRequest = new CreateAccount.Request(Name: "Test", Email: "test1@test.io", Password: "1234123");
 
         // Act
@@ -192,33 +188,42 @@ public class AccountsControllerTests
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         getAccountsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         getAccountsResult.RowCount.Should().Be(2);
-        getAccountsResult.Results.First().Should().BeOfType<Account>().Which.Name.Should().Be(admin.Account.Name);
+        getAccountsResult.Results.First().Should().BeOfType<Account>().Which.Name.Should().Be(admin.Value.Name);
         getAccountsResult.Results.Last().Should().BeOfType<Account>().Which.Name.Should().Be(createAccountRequest.Name);
     }
-    
+
     [Fact]
-    public async Task GetAccountList_WithoutAuthentication_ReturnsUnauthorized()
+    public async Task GetAccountList_WithoutAuthentication_ExpectsUnauthorized()
     {
         // Arrange
         using var env = new IntegrationTestEnvironment();
         
-        // Act
-        var getAccountsResponse = await env.Client.GetAsync($"https://localhost:5001/api/accounts?page=1&pageSize=5");
-
-        // Assert
-        getAccountsResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        // Act and Assert
+        await env.TestEndpointRequiresAuthenticationAsync(HttpVerb.Get,
+            "https://localhost:5001/api/accounts?page=1&pageSize=5");
     }
     
     [Fact]
-    public async Task GetAccountList_WithRegularUser_ReturnsForbidden()
+    public async Task GetAccountList_WithUser_ExpectsForbidden()
+    {
+        // Arrange
+        using var env = new IntegrationTestEnvironment();
+        
+        // Act and Assert
+        await env.TestEndpointRoleAuthorizationAsync(HttpVerb.Get,
+            "https://localhost:5001/api/accounts?page=1&pageSize=5", 
+            TestRoleAuthorizationScenario.AdminOnly);
+    }
+    
+    [Fact]
+    public async Task GetAccountList_WithRegularUser_ExpectsForbidden()
     {
         // Arrange
         using var env = new IntegrationTestEnvironment();
 
-        var user = new TestUser(env);
-        await user.Setup();
+        var user = await TestUser.MakeAsync(env);
         
-        var loginRequest = new Login.Request(Email: user.Account.Email, Password: TestUser.Password, Device: "Test", DeviceAgent: "Test", DeviceOS: "Test");
+        var loginRequest = new Login.Request(Email: user.Value.Email, Password: TestUser.Password, Device: "Test", DeviceAgent: "Test", DeviceOS: "Test");
 
         // Act
         var loginResponse = await env.Client.PostAsJsonAsync("https://localhost:5001/api/accounts/login", loginRequest);
@@ -233,22 +238,21 @@ public class AccountsControllerTests
     }
     
     [Fact]
-    public async Task GetAccountList_WithExpiredToken_ReturnsUnauthorized()
+    public async Task GetAccountList_WithExpiredToken_ExpectsUnauthorized()
     {
         // Arrange
         using var env = new IntegrationTestEnvironment();
         using var config = ScopedService<IConfiguration>.GetService(env.App);
-        
-        var admin = new TestAdmin(env);
-        await admin.Setup();
-        
+        using var admin = await TestAdmin.MakeAsync(env);
+
         var mockConfig = new Mock<IConfiguration>();
         mockConfig.Setup(s => s["Jwt:Key"]).Returns(config.Service["Jwt:Key"]);
         mockConfig.Setup(s => s["Jwt:Issuer"]).Returns(config.Service["Jwt:Issuer"]);
         mockConfig.Setup(s => s["Jwt:AccessTokenExpiryInMinutes"]).Returns("0");
-        var tokenService = new AuthTokenService(mockConfig.Object);
+        mockConfig.Setup(s => s["Jwt:RefreshTokenExpiryInMonths"]).Returns("0");
         
-        var accessToken = tokenService.GenerateAccessToken(admin.Account);
+        var tokenService = new AuthTokenService(mockConfig.Object);
+        var accessToken = tokenService.GenerateAccessToken(admin.Value);
         env.Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         // Act
