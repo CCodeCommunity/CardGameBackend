@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,14 +45,36 @@ public sealed class Startup
         // Note: https://stackoverflow.com/a/48278882
         services.AddHttpContextAccessor();
 
-        services.AddSwaggerGen(c => { c.SwaggerDoc("v1", new OpenApiInfo {Title = "Api", Version = "v1"}); });
+        services.AddSwaggerGen(options =>
+        {
+            options.SwaggerDoc("v1", new OpenApiInfo {Title = "Api", Version = "v1"});
+            options.CustomSchemaIds(type => type.ToString());
+        });
         
         // services.Configure<ForwardedHeadersOptions>(options =>
         // {
         //     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
         // });
-            
-        services.AddDbContext<DatabaseContext>(options => options.UseNpgsql(Configuration["DatabaseSettings:ConnectionString"]));
+
+        var usePsql = Configuration["DatabaseSettings:DbType"] == "Psql";
+        
+        if (usePsql)
+            services.AddDbContext<DatabaseContext>(options =>
+                options.UseNpgsql(Configuration["DatabaseSettings:ConnectionString"]));
+        else
+            services.AddDbContext<DatabaseContext>(options =>
+            {
+                // @link: https://docs.microsoft.com/en-us/dotnet/standard/data/sqlite/in-memory-databases
+                var connection = new SqliteConnection($"Data Source={Guid.NewGuid().ToString()};Mode=Memory;Cache=Shared;");
+
+                connection.Open();
+                        
+                var dbOptions = options.UseSqlite(connection).Options;
+
+                using var context = new DatabaseContext(dbOptions);
+
+                context.Database.EnsureCreated();
+            });
             
         services.AddScoped<AuthTokenService, AuthTokenService>();
 

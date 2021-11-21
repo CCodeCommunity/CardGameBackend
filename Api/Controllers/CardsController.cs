@@ -26,7 +26,6 @@ public class CardsController : ControllerBase
     }
 
     [HttpGet("count")]
-    [Authorize]
     public async Task<ActionResult<CardsCount.Response>> Count()
     {
         var result = await db.Cards.CountAsync();
@@ -34,7 +33,6 @@ public class CardsController : ControllerBase
     }
     
     [HttpGet("{cardId:int}")]
-    [Authorize]
     public async Task<ActionResult<Card>> GetCard(int cardId)
     {
         var card = await db.Cards.FindAsync(cardId);
@@ -45,7 +43,6 @@ public class CardsController : ControllerBase
     }
     
     [HttpGet]
-    [Authorize]
     public async Task<ActionResult<List<Card>>> GetCards(
         [FromQuery, Range(1, int.MaxValue)] int page, 
         [FromQuery, Range(1, int.MaxValue)] int pageSize)
@@ -68,7 +65,6 @@ public class CardsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize]
     public async Task<ActionResult<Card>> Create([FromBody] CreateCard.Request request)
     {
         var card = new Card
@@ -95,7 +91,6 @@ public class CardsController : ControllerBase
     }
     
     [HttpPatch("{cardId:int}")]
-    [Authorize]
     public async Task<ActionResult<Card>> Patch(int cardId, [FromBody] PatchCard.Request request)
     {
         var card = await db.Cards.FindAsync(cardId);
