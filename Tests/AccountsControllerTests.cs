@@ -133,6 +133,38 @@ public class AccountsControllerTests
     }
     
     [Fact]
+    public async Task LoginAdmin_GetNewAccessToken_ExpectsSuccessful()
+    {
+        // Arrange
+        using var env = new IntegrationTestEnvironment();
+        
+        var admin = await TestAdmin.MakeAsync(env);
+
+        var request = new Login.Request(
+            Email: admin.Value.Email,
+            Password: TestUser.Password, 
+            Device: "Test",
+            DeviceAgent: "Test", 
+            DeviceOS: "Test");
+
+        // Act
+        var loginResponse = await env.Client.PostAsJsonAsync("https://localhost:5001/api/accounts/login", request);
+        var loginResult = (await loginResponse.Content.ReadFromJsonAsync<Login.Response>())!;
+        
+        var getAccessTokenResponse = await env.Client.PatchAsJsonAsync("https://localhost:5001/api/accounts/access-token", new GetAccessToken.Request(loginResult.RefreshToken));
+        var getAccessTokenResult = (await getAccessTokenResponse.Content.ReadFromJsonAsync<GetAccessToken.Response>())!;
+        
+        // Assert
+        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        loginResult.RefreshToken.Should().NotBeNullOrWhiteSpace();
+        loginResult.AccessToken.Should().NotBeNullOrWhiteSpace();
+        
+        getAccessTokenResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        getAccessTokenResult.RefreshToken.Should().NotBeNullOrWhiteSpace();
+        getAccessTokenResult.AccessToken.Should().NotBeNullOrWhiteSpace();
+    }
+    
+    [Fact]
     public async Task LoginUser_GetNewAccessToken_TryOldAccessToken_ExpectsBothTokensAreNowInvalid()
     {
         // Arrange

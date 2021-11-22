@@ -73,7 +73,7 @@ public sealed class Startup
                 connection.Open();
                         
                 var dbOptions = options.UseSqlite(connection).Options;
-
+                
                 using var context = new DatabaseContext(dbOptions);
 
                 context.Database.EnsureCreated();
@@ -89,7 +89,7 @@ public sealed class Startup
                 });
 
                 context.SaveChangesAsync();
-            });
+            }, ServiceLifetime.Singleton, ServiceLifetime.Singleton);
             
         services.AddScoped<AuthTokenService, AuthTokenService>();
 
@@ -140,6 +140,13 @@ public sealed class Startup
     {
         if (env.IsDevelopment())
         {
+            app.UseCors(x => x
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .SetIsOriginAllowed(origin => true) // allow any origin
+                //.WithOrigins("https://localhost:44351"));
+                .AllowCredentials()); // allow credentials
+            
             app.UseExceptionHandler("/error-local-development");
             app.UseSwagger();
             app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "CC Card Game Api v1"));
