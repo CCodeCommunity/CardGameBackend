@@ -6,7 +6,6 @@ using Api.Authorization.Requirements;
 using Api.Enums;
 using Api.Models;
 using Api.Services;
-using Api.Utilities;
 using Isopoh.Cryptography.Argon2;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;

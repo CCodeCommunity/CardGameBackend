@@ -1,4 +1,6 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
+using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 using Api.Dtos;
@@ -9,11 +11,19 @@ using FluentAssertions;
 using Tests.Helpers;
 using Tests.Setups;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Tests;
 
 public class CardsControllerTests
 {
+    private readonly ITestOutputHelper output;
+
+    public CardsControllerTests(ITestOutputHelper output)
+    {
+        this.output = output;
+    }
+    
     [Fact]
     public async Task CountCards_TestAuthorizationAndAuthentication()
     {
@@ -336,6 +346,7 @@ public class CardsControllerTests
         // Act
         var patchCardResponse = await env.Client.PatchAsJsonAsync($"https://localhost:5001/api/cards/{card.Value.Id}", new PatchCard.Request(Name: "NewName"));
         var getCardResponse = await env.Client.GetAsync($"https://localhost:5001/api/cards/{card.Value.Id}");
+        //output.WriteLine($"StatusCode: {getCardResponse.StatusCode} Content: {await getCardResponse.Content.ReadAsStringAsync()}");
         var getCardResult = await getCardResponse.ParseJsonAsync<Card>();
         
         // Assert

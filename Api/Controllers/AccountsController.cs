@@ -185,7 +185,8 @@ public class AccountsController : Controller
     public async Task<ActionResult> ChangeAccountState(string accountId, [FromBody] ChangeAccountState.Request request)
     {
         var account = await db.Accounts.FindAsync(accountId);
-        if (account == null) return BadRequest();
+        if (account == null) 
+            return BadRequest();
 
         if (account.State != request.NewState)
         {
