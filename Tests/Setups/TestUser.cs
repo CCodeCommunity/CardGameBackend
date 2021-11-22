@@ -5,6 +5,7 @@ using Api;
 using Api.Enums;
 using Api.Models;
 using Api.Utilities;
+using Isopoh.Cryptography.Argon2;
 using Tests.Helpers;
 
 namespace Tests.Setups;
@@ -40,7 +41,7 @@ public class TestUser : IDisposable
             Id = await Nanoid.Nanoid.GenerateAsync(),
             Name = Name,
             Email = Email,
-            Password = await Argon2Utils.HashPasswordAsync(Password),
+            Password = Argon2.Hash(Password),
             Role = AccountRole.User,
             State = AccountState.Active
         };

@@ -142,7 +142,7 @@ public class AccountsControllerTests
 
         var request = new Login.Request(
             Email: admin.Value.Email,
-            Password: TestUser.Password, 
+            Password: TestAdmin.Password, 
             Device: "Test",
             DeviceAgent: "Test", 
             DeviceOS: "Test");

@@ -12,12 +12,12 @@ namespace Api.Authorization.Handlers;
 
 public class DefaultAuthorizationHandler : AuthorizationHandler<DefaultAuthorization>
 {
-    private readonly AccessTokenBlackListService blackListService;
+    private readonly AccessTokenTrackingService trackingService;
     private readonly IHttpContextAccessor httpContextAccessor;
 
-    public DefaultAuthorizationHandler(AccessTokenBlackListService blackListService, IHttpContextAccessor httpContextAccessor)
+    public DefaultAuthorizationHandler(AccessTokenTrackingService trackingService, IHttpContextAccessor httpContextAccessor)
     {
-        this.blackListService = blackListService;
+        this.trackingService = trackingService;
         this.httpContextAccessor = httpContextAccessor;
     }
 
@@ -30,7 +30,7 @@ public class DefaultAuthorizationHandler : AuthorizationHandler<DefaultAuthoriza
             var claims = new JwtSecurityTokenHandler().ReadJwtToken(token);
             var issuedAt = claims.ValidFrom;
             var accountId = claims.Claims.First(it => it.Type == ClaimTypes.PrimarySid).Value;
-            var blackListed = await blackListService.IsTokenBlackListedAsync(accountId, issuedAt);
+            var blackListed = await trackingService.IsTokenBlackListedAsync(accountId, issuedAt);
 
             if (blackListed == false)
             {

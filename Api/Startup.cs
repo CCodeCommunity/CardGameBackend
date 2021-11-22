@@ -7,6 +7,7 @@ using Api.Enums;
 using Api.Models;
 using Api.Services;
 using Api.Utilities;
+using Isopoh.Cryptography.Argon2;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -65,14 +66,14 @@ public sealed class Startup
             services.AddDbContext<DatabaseContext>(options =>
                 options.UseNpgsql(Configuration["DatabaseSettings:ConnectionString"]));
         else
-            services.AddDbContext<DatabaseContext>(options =>
+            services.AddDbContext<DatabaseContext>(builder =>
             {
                 // @link: https://docs.microsoft.com/en-us/dotnet/standard/data/sqlite/in-memory-databases
-                var connection = new SqliteConnection($"Data Source={Guid.NewGuid().ToString()};Mode=Memory;Cache=Shared;");
+                var connection = new SqliteConnection($"Data Source=TestSomething;Mode=Memory;Cache=Shared;");
 
                 connection.Open();
                         
-                var dbOptions = options.UseSqlite(connection).Options;
+                var dbOptions = builder.UseSqlite(connection).Options;
                 
                 using var context = new DatabaseContext(dbOptions);
 
@@ -83,17 +84,17 @@ public sealed class Startup
                     Id = Nanoid.Nanoid.Generate(),
                     Name = "admin",
                     Email = "admin@cardgame.cc",
-                    Password = Argon2Utils.HashPassword("admin"),
+                    Password = Argon2.Hash("admin"),
                     Role = AccountRole.Admin,
                     State = AccountState.Active
                 });
 
                 context.SaveChangesAsync();
-            }, ServiceLifetime.Singleton, ServiceLifetime.Singleton);
+            });
             
         services.AddScoped<AuthTokenService, AuthTokenService>();
 
-        services.AddScoped<AccessTokenBlackListService, AccessTokenBlackListService>();
+        services.AddScoped<AccessTokenTrackingService, AccessTokenTrackingService>();
         
         services.AddScoped<IAuthorizationHandler, DefaultAuthorizationHandler>();
         

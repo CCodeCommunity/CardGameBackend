@@ -6,6 +6,7 @@ using Api;
 using Api.Enums;
 using Api.Models;
 using Api.Utilities;
+using Isopoh.Cryptography.Argon2;
 
 namespace Tests.Setups;
 
@@ -34,13 +35,13 @@ public class TestAdmin : IDisposable
     public async Task Setup()
     {
         using var db = ScopedService<DatabaseContext>.GetService(env.App);
-
+        
         Value = new Account
         {
             Id = await Nanoid.Nanoid.GenerateAsync(),
             Name = Name,
             Email = Email,
-            Password = await Argon2Utils.HashPasswordAsync(Password),
+            Password = Argon2.Hash(Password),
             Role = AccountRole.Admin,
             State = AccountState.Active
         };

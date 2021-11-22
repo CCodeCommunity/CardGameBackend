@@ -2,7 +2,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Net.Mime;
-using System.Security.Claims;
 using System.Threading.Tasks;
 using Api.Authorization;
 using Api.Dtos;
@@ -11,6 +10,7 @@ using Api.Models;
 using Api.Services;
 using Api.Utilities;
 using Ardalis.Filters;
+using Isopoh.Cryptography.Argon2;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -28,22 +28,22 @@ public class AccountsController : Controller
     private readonly DatabaseContext db;
     private readonly AuthTokenService tokenService;
     private readonly IHttpContextAccessor httpContextAccessor;
-    private readonly AccessTokenBlackListService blackListService;
+    private readonly AccessTokenTrackingService tokenTrackingService;
 
     public AccountsController(
         DatabaseContext db, 
         IHttpContextAccessor httpContextAccessor, 
         AuthTokenService tokenService,
-        AccessTokenBlackListService blackListService)
+        AccessTokenTrackingService tokenTrackingService)
     {
         this.db = db;
         this.tokenService = tokenService;
-        this.blackListService = blackListService;
+        this.tokenTrackingService = tokenTrackingService;
         this.httpContextAccessor = httpContextAccessor;
     }
 
     [HttpPatch("access-token")]
-    public async Task<ActionResult<GetAccessToken.Request>> GetAccessToken([FromBody] GetAccessToken.Request request)
+    public async Task<ActionResult<GetAccessToken.Response>> GetAccessToken([FromBody] GetAccessToken.Request request)
     {
         var loginInstance = await db.LoginInstance
             .Include(it => it.Account)
@@ -52,14 +52,14 @@ public class AccountsController : Controller
         if (loginInstance == null)
             return BadRequest();
 
-        if (loginInstance.Valid == false)
+        if (loginInstance.State != LoginInstanceState.Valid)
         {
             // Refresh token does not match access token, tokens were compromised
             await db.LoginInstance
-                .Where(it => it.AccountId == loginInstance.AccountId && it.Valid == true)
-                .UpdateAsync(it => new LoginInstance {Valid = false});
+                .Where(it => it.AccountId == loginInstance.AccountId && it.State == LoginInstanceState.Valid)
+                .UpdateAsync(it => new LoginInstance { State = LoginInstanceState.Compromised });
 
-            await blackListService.BlackListAccessTokensForUserAsync(loginInstance.AccountId);
+            await tokenTrackingService.BlackListAccessTokensForUserAsync(loginInstance.AccountId);
             
             await db.SaveChangesAsync();
             
@@ -74,9 +74,11 @@ public class AccountsController : Controller
         if (newRefreshToken == null) 
             return BadRequest();
 
-        var blackListed = await blackListService.IsTokenBlackListedAsync(loginInstance.AccountId, loginInstance.CreatedAt);
+        var blackListed = await tokenTrackingService.IsTokenBlackListedAsync(loginInstance.AccountId, loginInstance.CreatedAt);
         if (blackListed)
             return BadRequest();
+
+        loginInstance.LastTokenGrantedAt = DateTime.UtcNow;
 
         return Ok(new GetAccessToken.Response(
             AccessToken: newAccessToken,
@@ -90,10 +92,12 @@ public class AccountsController : Controller
         var login = await db.LoginInstance.FindAsync(request.RefreshToken);
         if (login == null) return UnprocessableEntity();
 
-        login.Valid = false;
+        login.State = LoginInstanceState.LoggedOut;
 
         return Ok();
     }
+    
+    // Todo: endpoint to invalidate all tokens manually 
 
     [HttpPost("login")]
     public async Task<ActionResult<Login.Response>> Login([FromBody] Login.Request request)
@@ -102,7 +106,7 @@ public class AccountsController : Controller
         if (account == null) 
             return BadRequest();
 
-        var passwordValid = await Argon2Utils.VerifyHashAsync(request.Password, account.Password);
+        var passwordValid = Argon2.Verify(encoded: account.Password, password: request.Password);
         if (!passwordValid) 
             return BadRequest();
             
@@ -113,6 +117,8 @@ public class AccountsController : Controller
         var refreshToken = tokenService.GenerateRefreshToken(account);
         if (refreshToken == null) 
             return BadRequest();
+
+        var now = DateTime.UtcNow;
         
         await db.LoginInstance.AddAsync(new LoginInstance
         {
@@ -121,10 +127,10 @@ public class AccountsController : Controller
             DeviceAgent = request.DeviceAgent,
             DeviceOS = request.DeviceOS,
             Ip = httpContextAccessor.HttpContext!.GetRequestIP(),
-            CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddMonths(10),
+            CreatedAt = now,
+            LastTokenGrantedAt = now, 
             AccountId = account.Id,
-            Valid = true,
+            State = LoginInstanceState.Valid
         });
 
         await db.SaveChangesAsync();
@@ -143,7 +149,7 @@ public class AccountsController : Controller
             Id = await Nanoid.Nanoid.GenerateAsync(),
             Name = request.Name,
             Email = request.Email,
-            Password = await Argon2Utils.HashPasswordAsync(request.Password),
+            Password = Argon2.Hash(request.Password),
             Role = AccountRole.User,
             State = AccountState.PendingApproval
         };
@@ -170,7 +176,7 @@ public class AccountsController : Controller
             if (request.NewState == AccountState.Suspended)
             {
                 // Todo: Email user that the account is now suspended
-                await blackListService.BlackListAccessTokensForUserAsync(accountId);
+                await tokenTrackingService.BlackListAccessTokensForUserAsync(accountId);
             }
             
             account.State = request.NewState;

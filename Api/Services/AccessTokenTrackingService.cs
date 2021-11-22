@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace Api.Services;
 
-public class AccessTokenBlackListService
+public class AccessTokenTrackingService
 {
     private static readonly Dictionary<string, DateTime> BlackList = new();
 
