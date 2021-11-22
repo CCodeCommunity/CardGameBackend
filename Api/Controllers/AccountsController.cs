@@ -2,6 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Net.Mime;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Api.Authorization;
 using Api.Dtos;
@@ -45,12 +46,27 @@ public class AccountsController : Controller
     [HttpPatch("access-token")]
     public async Task<ActionResult<GetAccessToken.Response>> GetAccessToken([FromBody] GetAccessToken.Request request)
     {
+        var claims = tokenService.IsAccessTokenValid(request.RefreshToken)?.Claims;
+        if (claims == null)
+            return BadRequest();
+        
         var loginInstance = await db.LoginInstance
             .Include(it => it.Account)
-            .FirstOrDefaultAsync(it => it.Token == request.RefreshToken);
-        
+            .FirstOrDefaultAsync(it => it.CurrentRefreshToken == request.RefreshToken);
+
         if (loginInstance == null)
+        {
+            var accountId = claims.FirstOrDefault(it => it.Type == ClaimTypes.PrimarySid)!.Value;
+            await db.LoginInstance
+                .Where(it => it.AccountId == accountId && it.State == LoginInstanceState.Valid)
+                .UpdateAsync(it => new LoginInstance { State = LoginInstanceState.Compromised });
+            
+            await tokenTrackingService.BlackListAccessTokensForUserAsync(accountId);
+            
+            await db.SaveChangesAsync();
+            
             return BadRequest();
+        }
 
         if (loginInstance.State != LoginInstanceState.Valid)
         {
@@ -78,6 +94,7 @@ public class AccountsController : Controller
         if (blackListed)
             return BadRequest();
 
+        loginInstance.CurrentRefreshToken = newRefreshToken;
         loginInstance.LastTokenGrantedAt = DateTime.UtcNow;
 
         return Ok(new GetAccessToken.Response(
@@ -102,7 +119,9 @@ public class AccountsController : Controller
     [HttpPost("login")]
     public async Task<ActionResult<Login.Response>> Login([FromBody] Login.Request request)
     {
-        var account = await db.Accounts.Where(it => it.Email == request.Email).FirstOrDefaultAsync();
+        var account = await db.Accounts
+            .Where(it => it.Email == request.Email)
+            .FirstOrDefaultAsync();
         if (account == null) 
             return BadRequest();
 
@@ -122,7 +141,7 @@ public class AccountsController : Controller
         
         await db.LoginInstance.AddAsync(new LoginInstance
         {
-            Token = refreshToken,
+            CurrentRefreshToken = refreshToken,
             Device = request.Device,
             DeviceAgent = request.DeviceAgent,
             DeviceOS = request.DeviceOS,

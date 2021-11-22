@@ -6,14 +6,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Models;
 
-[Index(nameof(Token), IsUnique = true)]
+[Index(nameof(CurrentRefreshToken), IsUnique = true)]
 [Index(nameof(AccountId), IsUnique = false)]
 public class LoginInstance
 {
     [Key] [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     [Required] public int Id { get; set; }
     
-    [Required] public string Token { get; set; } = null!;
+    [Required] public string CurrentRefreshToken { get; set; } = null!;
 
     [Required] public string Device { get; set; } = null!;
         
