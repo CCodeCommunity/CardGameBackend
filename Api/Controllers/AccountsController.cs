@@ -97,6 +97,8 @@ public class AccountsController : Controller
         loginInstance.CurrentRefreshToken = newRefreshToken;
         loginInstance.LastTokenGrantedAt = DateTime.UtcNow;
 
+        await db.SaveChangesAsync();
+
         return Ok(new GetAccessToken.Response(
             AccessToken: newAccessToken,
             RefreshToken: newRefreshToken

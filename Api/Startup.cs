@@ -31,6 +31,8 @@ public sealed class Startup
 
     public IConfiguration Configuration { get; }
 
+    public bool initDb = false;
+
     // This method gets called by the runtime. Use this method to add services to the container.
     public void ConfigureServices(IServiceCollection services)
     {
@@ -78,6 +80,10 @@ public sealed class Startup
 
                 context.Database.EnsureCreated();
 
+                if (initDb) return;
+                
+                initDb = true;
+                    
                 context.Accounts.Add(new Account
                 {
                     Id = Nanoid.Nanoid.Generate(),
@@ -88,7 +94,7 @@ public sealed class Startup
                     State = AccountState.Active
                 });
 
-                context.SaveChangesAsync();
+                context.SaveChanges();
             });
             
         services.AddScoped<AuthTokenService, AuthTokenService>();
